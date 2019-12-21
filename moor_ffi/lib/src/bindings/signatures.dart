@@ -29,6 +29,13 @@ typedef sqlite3_exec_native = Int32 Function(
     Pointer<Void> firstCbArg,
     Pointer<Pointer<CBlob>> errorOut);
 
+typedef sqlite3_load_extension_native = Int32 Function(
+    Pointer<Database> database,
+    Pointer<CBlob> file,
+    Pointer<CBlob> entry_point,
+    Pointer<Pointer<CBlob>> errorOut);
+
+
 typedef sqlite3_step_native_t = Int32 Function(Pointer<Statement> statement);
 
 typedef sqlite3_reset_native_t = Int32 Function(Pointer<Statement> statement);
