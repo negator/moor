@@ -29,7 +29,7 @@ class PreparedStatement {
 
   /// Executes this prepared statement as a select statement. The returned rows
   /// will be returned.
-  Result select([List<dynamic> params]) {
+  Future<Result> select([List<dynamic> params]) async {
     _ensureNotFinalized();
     _reset();
     _bindParams(params);
@@ -45,7 +45,7 @@ class PreparedStatement {
       names[i] = bindings.sqlite3_column_name(_stmt, i).readString();
     }
 
-    while (_step() == Errors.SQLITE_ROW) {
+    while ((await _step()) == Errors.SQLITE_ROW) {
       rows.add([for (var i = 0; i < columnCount; i++) _readValue(i)]);
     }
 
@@ -74,12 +74,12 @@ class PreparedStatement {
   }
 
   /// Executes this prepared statement.
-  void execute([List<dynamic> params]) {
+  Future<void> execute([List<dynamic> params]) async {
     _ensureNotFinalized();
     _reset();
     _bindParams(params);
 
-    final result = _step();
+    final result = await _step();
 
     if (result != Errors.SQLITE_OK && result != Errors.SQLITE_DONE) {
       throw SqliteException._fromErrorCode(_db._db, result);
@@ -131,5 +131,5 @@ class PreparedStatement {
     _bound = true;
   }
 
-  int _step() => bindings.sqlite3_step(_stmt);
+  Future<int> _step() => _db.step(_stmt);
 }

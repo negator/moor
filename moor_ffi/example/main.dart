@@ -7,18 +7,18 @@ CREATE TABLE frameworks (
 );
 ''';
 
-void main() {
+void main() async {
   final db = Database.memory();
   db.execute(_createTable);
 
-  final insertStmt = db.prepare('INSERT INTO frameworks(name) VALUES (?)');
+  final insertStmt = await db.prepare('INSERT INTO frameworks(name) VALUES (?)');
   insertStmt.execute(['Flutter']);
   insertStmt.execute(['AngularDart']);
   insertStmt.close();
 
-  final selectStmt = db.prepare('SELECT * FROM frameworks ORDER BY name');
-  final result = selectStmt.select();
-  for (final row in result) {
+  final selectStmt = await db.prepare('SELECT * FROM frameworks ORDER BY name');
+  final result = await selectStmt.select();
+  for (var row in result) {
     print('${row['id']}: ${row['name']}');
   }
 

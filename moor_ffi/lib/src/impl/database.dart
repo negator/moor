@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -13,6 +14,7 @@ import 'package:moor_ffi/src/ffi/utils.dart';
 
 part 'errors.dart';
 part 'prepared_statement.dart';
+part 'isolate.dart';
 
 const _openingFlags = Flags.SQLITE_OPEN_READWRITE | Flags.SQLITE_OPEN_CREATE;
 
@@ -21,6 +23,8 @@ class Database {
   final Pointer<types.Database> _db;
   final List<PreparedStatement> _preparedStmt = [];
   bool _isClosed = false;
+
+  DatabaseIsolate isolate = DatabaseIsolate();
 
   Database._(this._db);
 
@@ -74,8 +78,9 @@ class Database {
     }
     _isClosed = true;
 
-    // we don't need to deallocate the _db pointer, sqlite takes care of that
+    isolate.shutdown();
 
+    // we don't need to deallocate the _db pointer, sqlite takes care of that
     if (exception != null) {
       throw exception;
     }
@@ -87,16 +92,18 @@ class Database {
     }
   }
 
+
   /// Executes the [sql] statement and ignores the result. Will throw if an
   /// error occurs while executing.
-  void execute(String sql) {
+  Future<void> execute(String sql) async {
     _ensureOpen();
+
 
     final sqlPtr = CBlob.allocateString(sql);
     final errorOut = allocate<Pointer<CBlob>>();
 
-    final result =
-        bindings.sqlite3_exec(_db, sqlPtr, nullPtr(), nullPtr(), errorOut);
+    final result = await isolate.run(Arguments(Operation.sqlite3_exec,
+        dbOut: _db.address, sqlPtr: sqlPtr.address, errorOut: errorOut.address));
 
     sqlPtr.free();
 
@@ -116,14 +123,15 @@ class Database {
   }
 
   /// Prepares the [sql] statement.
-  PreparedStatement prepare(String sql) {
+  Future<PreparedStatement> prepare(String sql) async {
     _ensureOpen();
 
     final stmtOut = allocate<Pointer<types.Statement>>();
     final sqlPtr = CBlob.allocateString(sql);
 
-    final resultCode =
-        bindings.sqlite3_prepare_v2(_db, sqlPtr, -1, stmtOut, nullPtr());
+    final resultCode = await isolate.run(Arguments(Operation.sqlite3_prepare_v2,
+        dbOut: _db.address, sqlPtr: sqlPtr.address, stmtOut: stmtOut.address));
+
     sqlPtr.free();
 
     final stmt = stmtOut.value;
@@ -141,19 +149,21 @@ class Database {
     return prepared;
   }
 
+  Future<int> step(Pointer<types.Statement> stmt) =>
+      isolate.run(Arguments(Operation.sqlite3_step, statement: stmt.address));
+
   /// Get the application defined version of this database.
-  int userVersion() {
-    final stmt = prepare('PRAGMA user_version');
-    final result = stmt.select();
+  Future<int> userVersion() async {
+    final stmt = await prepare('PRAGMA user_version');
+    final result = await stmt.select();
     stmt.close();
 
     return result.first.columnAt(0) as int;
   }
 
   /// Update the application defined version of this database.
-  void setUserVersion(int version) {
-    execute('PRAGMA user_version = $version');
-  }
+  Future<void> setUserVersion(int version) =>
+      execute('PRAGMA user_version = $version');
 
   /// Returns the amount of rows affected by the last INSERT, UPDATE or DELETE
   /// statement.

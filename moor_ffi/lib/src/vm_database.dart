@@ -46,22 +46,22 @@ class _VmDelegate extends DatabaseDelegate {
 
   @override
   Future<void> runBatched(List<BatchedStatement> statements) async {
-    for (final stmt in statements) {
-      final prepared = _db.prepare(stmt.sql);
-      stmt.variables.forEach(prepared.execute);
 
+    for (final stmt in statements) {
+      final prepared = await _db.prepare(stmt.sql);
+      stmt.variables.forEach(await prepared.execute);
       prepared.close();
     }
 
-    return Future.value();
+    return;
   }
 
   Future _runWithArgs(String statement, List<dynamic> args) async {
     if (args.isEmpty) {
       _db.execute(statement);
     } else {
-      final stmt = _db.prepare(statement);
-      stmt.execute(args);
+      final stmt = await _db.prepare(statement);
+      await stmt.execute(args);
       stmt.close();
     }
   }
@@ -85,8 +85,8 @@ class _VmDelegate extends DatabaseDelegate {
 
   @override
   Future<QueryResult> runSelect(String statement, List args) async {
-    final stmt = _db.prepare(statement);
-    final result = stmt.select(args);
+    final stmt = await _db.prepare(statement);
+    final result = await stmt.select(args);
     stmt.close();
 
     return Future.value(QueryResult(result.columnNames, result.rows));
